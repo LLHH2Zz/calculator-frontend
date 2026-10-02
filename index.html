@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内网计算器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            max-width: 640px;
+            margin: 40px auto;
+            padding: 0 20px;
+            background: #f0f2f5;
+        }
+        .calculator {
+            background: #fff;
+            padding: 24px;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        #display {
+            width: 100%;
+            height: 60px;
+            font-size: 28px;
+            text-align: right;
+            padding: 0 16px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            background: #f9fafb;
+            outline: none;
+        }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .btn {
+            height: 54px;
+            font-size: 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: #f3f4f6;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #e5e7eb;
+        }
+        .btn.operator {
+            background: #fde68a;
+        }
+        .btn.operator:hover {
+            background: #fcd34d;
+        }
+        .btn.function {
+            background: #bfdbfe;
+        }
+        .btn.function:hover {
+            background: #93c5fd;
+        }
+        .btn.equal {
+            background: #86efac;
+        }
+        .btn.equal:hover {
+            background: #4ade80;
+        }
+        .history-section {
+            margin-top: 30px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .history-header h3 {
+            font-size: 18px;
+            color: #1f2937;
+        }
+        .clear-btn {
+            padding: 6px 12px;
+            font-size: 14px;
+            border: none;
+            border-radius: 6px;
+            background: #fecaca;
+            cursor: pointer;
+        }
+        .clear-btn:hover {
+            background: #fca5a5;
+        }
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .history-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        .history-expr {
+            font-size: 16px;
+            color: #374151;
+            margin-bottom: 4px;
+        }
+        .history-time {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <input type="text" id="display" readonly>
+        <div class="btn-grid">
+            <button class="btn function" onclick="clearAll()">C</button>
+            <button class="btn function" onclick="undo()">撤销</button>
+            <button class="btn function" onclick="append('(')">(</button>
+            <button class="btn function" onclick="append(')')">)</button>
+
+            <button class="btn" onclick="append('7')">7</button>
+            <button class="btn" onclick="append('8')">8</button>
+            <button class="btn" onclick="append('9')">9</button>
+            <button class="btn operator" onclick="append('×')">×</button>
+
+            <button class="btn" onclick="append('4')">4</button>
+            <button class="btn" onclick="append('5')">5</button>
+            <button class="btn" onclick="append('6')">6</button>
+            <button class="btn operator" onclick="append('÷')">÷</button>
+
+            <button class="btn" onclick="append('1')">1</button>
+            <button class="btn" onclick="append('2')">2</button>
+            <button class="btn" onclick="append('3')">3</button>
+            <button class="btn operator" onclick="append('-')">-</button>
+
+            <button class="btn" onclick="append('0')">0</button>
+            <button class="btn" onclick="append('.')">.</button>
+            <button class="btn equal" onclick="submitCalculate()">=</button>
+            <button class="btn operator" onclick="append('+')">+</button>
+        </div>
+    </div>
+
+    <div class="history-section">
+        <div class="history-header">
+            <h3>计算历史</h3>
+            <button class="clear-btn" onclick="clearHistory()">一键清空</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+    </div>
+
+    <script>
+        const display = document.getElementById('display');
+        const historyList = document.getElementById('historyList');
+
+        function append(char) {
+            display.value += char;
+        }
+
+        function clearAll() {
+            display.value = '';
+        }
+
+        function undo() {
+            display.value = display.value.slice(0, -1);
+        }
+
+        async function submitCalculate() {
+            const expr = display.value.trim();
+            if (!expr) return;
+
+            try {
+                const res = await fetch('/calculate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ expression: expr })
+                });
+                const data = await res.json();
+                display.value = data.record.result;
+                renderHistory(data.history);
+            } catch (e) {
+                display.value = '连接错误';
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/get_history');
+                const data = await res.json();
+                renderHistory(data.history);
+            } catch (e) {
+                console.error('加载历史失败');
+            }
+        }
+
+        function renderHistory(list) {
+            historyList.innerHTML = '';
+            list.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `
+                    <div class="history-expr">${item.expr} = ${item.result}</div>
+                    <div class="history-time">${item.time}</div>
+                `;
+                historyList.appendChild(div);
+            });
+        }
+
+        async function clearHistory() {
+            if (!confirm('确定要清空全部历史记录吗？')) return;
+            try {
+                const res = await fetch('/clear_history', { method: 'POST' });
+                const data = await res.json();
+                renderHistory(data.history);
+            } catch (e) {
+                alert('清空失败');
+            }
+        }
+
+        window.onload = loadHistory;
+    </script>
+</body>
+</html>
